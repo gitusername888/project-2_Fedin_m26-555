@@ -1,0 +1,22 @@
+[project]
+name = "primitive-db"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Dima", email = "fdu11287@yandex.ru" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+project = "primitive_db.main:main" 
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.0",
+]
