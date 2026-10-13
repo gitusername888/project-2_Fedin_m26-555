@@ -1,0 +1,44 @@
+{
+  "users": {
+    "columns": [
+      [
+        "ID",
+        "int"
+      ],
+      [
+        "name",
+        "str"
+      ],
+      [
+        "age",
+        "int"
+      ],
+      [
+        "is_active",
+        "bool"
+      ]
+    ],
+    "rows": []
+  },
+  "sers": {
+    "columns": [
+      [
+        "ID",
+        "int"
+      ],
+      [
+        "name",
+        "str"
+      ],
+      [
+        "age",
+        "int"
+      ],
+      [
+        "is_active",
+        "bool"
+      ]
+    ],
+    "rows": []
+  }
+}
