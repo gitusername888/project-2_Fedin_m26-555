@@ -1,8 +1,14 @@
 [
   {
-    "ID": 1,
-    "name": "Alice,",
+    "ID": 3,
+    "name": "(Sergei,",
     "age": 28,
+    "is_active": true
+  },
+  {
+    "ID": 4,
+    "name": "Sergei",
+    "age": 29,
     "is_active": true
   }
 ]

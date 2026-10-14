@@ -79,21 +79,43 @@ def _get_schema_columns(metadata: Dict[str, Any], table_name: str):
 def _cast_value(value: Any, expected_type: str):
     """Приводит значение к ожидаемому типу, учитывая bool как особый случай."""
     if expected_type == "int":
-        return int(value)
+        if isinstance(value, int):
+            return value
+        if not isinstance(value, str):
+            raise ValueError(f"Для типа int ожидается строка или число, получено: {value!r}")
+        # Убираем возможные пробелы
+        s = value.strip()
+        # Если вдруг случайно попала запятая как разделитель тысяч — удаляем её
+        # Но только если это выглядит как число с запятой: "1,000" -> 1000
+        if "," in s and s.replace(",", "").isdigit():
+            s = s.replace(",", "")
+        try:
+            return int(s)
+        except ValueError:
+            raise ValueError(f"Не удалось преобразовать '{value}' в int.")
     elif expected_type == "str":
-        return str(value)
+        return str(value[1:-1])
     elif expected_type == "bool":
         if isinstance(value, bool):
             return value
-        if isinstance(value, str):
-            v = value.lower()
-            if v in ("true", "1", "yes"):
-                return True
-            elif v in ("false", "0", "no"):
-                return False
-        # fallback
-        return bool(value)
-    return value
+        if not isinstance(value, str):
+            raise ValueError(f"Для типа bool ожидается строка, получено: {value!r}")
+
+        s = value.strip().lower()
+
+        # Очищаем от окружающих скобок: (true) -> true, (TRUE) -> true
+        if s.endswith(")") and len(s) > 2:
+            s = s[:-1].strip().lower()
+
+        if s in ("true", "1", "yes"):
+            return True
+        if s in ("false", "0", "no"):
+            return False
+
+        raise ValueError(f"Не удалось интерпретировать '{value}' как bool. Допустимы: true/false, 1/0, yes/no.")
+
+    else:
+        return value
 
 def insert(metadata: Dict[str, Any], table_name: str, values: List[Any]) -> List[Dict[str, Any]]:
     schema = _get_schema_columns(metadata, table_name)
@@ -129,29 +151,50 @@ def insert(metadata: Dict[str, Any], table_name: str, values: List[Any]) -> List
 def select(table_data: List[Dict], where_clause: Optional[Dict] = None):
     if not where_clause:
         return table_data
+
+
     result = []
     for row in table_data:
         match = True
-        for k, v in where_clause.items():
-            if k not in row or row[k] != v:
+        for k, v_where in where_clause.items():
+            if k not in row:
+                match = False
+                break
+            v_row = row[k]
+            # Строгое сравнение: тип и значение
+            if type(v_row) is not type(v_where) or v_row != v_where:
                 match = False
                 break
         if match:
             result.append(row)
     return result
 
-def update(table_data: List[Dict], set_clause: Dict, where_clause: Dict) -> List[Dict]:
-    updated = False
+def update(table_data: List[Dict], set_clause: Dict[str, Any], where_clause: Dict[str, Any]) -> List[Dict]:
+
     for row in table_data:
-        match = all(row.get(k) == v for k, v in where_clause.items())
-        if match:
-            for k, v in set_clause.items():
-                if k in row:
-                    row[k] = v
-                    updated = True
-    if updated:
-        # Сохраняем внутри engine, здесь просто возвращаем
-        pass
+        # Проверяем полное совпадение условия WHERE
+      
+        match = True
+        for k, v_where in where_clause.items():
+            # Если колонки нет в строке — не совпадение
+            if k not in row:
+                match = False
+                break
+            
+            v_row = row[k]
+            
+            
+            # Строгое сравнение: типы должны совпадать И значения должны совпадать
+            if type(v_row) is not type(v_where) or v_row != v_where:
+                match = False
+                break
+        
+            if match:
+                # Применяем SET только для совпавших строк
+                for k, v_set in set_clause.items():
+                    if k in row:
+                        row[k] = v_set
+
     return table_data
 
 def delete(table_data: List[Dict], where_clause: Dict) -> List[Dict]:
