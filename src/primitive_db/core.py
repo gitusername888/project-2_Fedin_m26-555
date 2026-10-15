@@ -117,7 +117,7 @@ def _cast_value(value: Any, expected_type: str):
     else:
         return value
 
-def insert(metadata: Dict[str, Any], table_name: str, values: List[Any]) -> List[Dict[str, Any]]:
+def insert(metadata: Dict[str, Any], table_name: str, values: List[Any]) -> int:
     schema = _get_schema_columns(metadata, table_name)
     # schema[0] — это ID:int, его мы генерируем сами
     expected_count = len(schema) - 1
@@ -143,10 +143,10 @@ def insert(metadata: Dict[str, Any], table_name: str, values: List[Any]) -> List
     row = {"ID": new_id}
     for (col_name, col_type), val in zip(schema[1:], values):
         row[col_name] = _cast_value(val, col_type)
-
+    id_count = row.get("ID")
     table_data.append(row)
     save_table_data(table_name, table_data)
-    return table_data
+    return id_count
 
 def select(table_data: List[Dict], where_clause: Optional[Dict] = None):
     if not where_clause:
@@ -169,8 +169,8 @@ def select(table_data: List[Dict], where_clause: Optional[Dict] = None):
             result.append(row)
     return result
 
-def update(table_data: List[Dict], set_clause: Dict[str, Any], where_clause: Dict[str, Any]) -> List[Dict]:
-
+def update(table_data: List[Dict], set_clause: Dict[str, Any], where_clause: Dict[str, Any]) -> Tuple[List[Dict], List]:
+    id_count =[]
     for row in table_data:
         # Проверяем полное совпадение условия WHERE
       
@@ -194,12 +194,42 @@ def update(table_data: List[Dict], set_clause: Dict[str, Any], where_clause: Dic
                 for k, v_set in set_clause.items():
                     if k in row:
                         row[k] = v_set
+                if "ID" in row:
+                    id_count.append(row["ID"])    
 
-    return table_data
+    return table_data,id_count
 
-def delete(table_data: List[Dict], where_clause: Dict) -> List[Dict]:
-    before_len = len(table_data)
-    filtered = [row for row in table_data if not all(row.get(k) == v for k, v in where_clause.items())]
-    if len(filtered) < before_len:
-        pass  # удаление произошло
-    return filtered
+def delete(table_data: List[Dict], where_clause: Dict) -> Tuple[List[Dict], List]:
+    
+    """
+    Удаляет строки, строго совпадающие с where_clause.
+    Возвращает (оставшиеся_данные, список_ID_удалённых_строк).
+    """
+    remaining = []
+    deleted_ids = []
+
+    for row in table_data:
+        # row — это dict, у него есть .get() и ключи
+        match = True
+        for k, v_where in where_clause.items():
+            # Если ключа нет в строке — не совпадение
+            if k not in row:
+                match = False
+                break
+
+            v_row = row[k]
+            # Строгое сравнение: тип и значение должны совпадать
+            if type(v_row) is not type(v_where) or v_row != v_where:
+                match = False
+                break
+
+        if match:
+            # Строка подходит под WHERE → удаляем (не добавляем в remaining)
+            if "ID" in row:
+                deleted_ids.append(row["ID"])
+            # Можно добавить логирование: print(f"Удалена строка с ID={row['ID']}")
+        else:
+            # Не подходит → оставляем
+            remaining.append(row)
+
+    return remaining, deleted_ids
