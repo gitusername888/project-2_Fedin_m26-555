@@ -6,3 +6,4 @@
  data/
  database.cast
  .ruff_cache
+ data/users.json
