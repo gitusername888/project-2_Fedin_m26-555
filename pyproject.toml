@@ -1,10 +1,11 @@
 [project]
 name = "primitive-db"
 version = "0.1.0"
-description = "Add your description here"
+description = "PrimitiveDB — простая консольная реляционная база данных с SQL-подобным интерфейсом.
+Данные хранятся в JSON-файлах, метаданные таблиц — в `db_meta.json`."
 readme = "README.md"
 authors = [
-    { name = "Dima", email = "fdu11287@yandex.ru" }
+    { name = "Fedin_m26-555", email = "fdu11287@yandex.ru" }
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -13,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-project = "primitive_db.main:main" 
+database = "primitive_db.main:main" 
 
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]

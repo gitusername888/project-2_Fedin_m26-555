@@ -1,6 +1,6 @@
 import json
-from pathlib import Path
 import os
+from pathlib import Path
 
 METADATA_FILE = "db_meta.json"
 DATA_DIR = "data"
@@ -8,7 +8,8 @@ DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
 
 def load_metadata(filepath: str | Path | None = None) -> dict:
-    """Загружает данные из JSON-файла. Если файл не найден, возвращает пустой словарь."""
+    "Загружает данные из JSON-файла."
+    " Если файл не найден, возвращает пустой словарь."
     if filepath is None:
         filepath = METADATA_FILE
     try:

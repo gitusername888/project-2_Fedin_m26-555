@@ -1,25 +1,34 @@
-from typing import Any, Dict, List, Tuple, Optional
+import os
+from typing import Any, Dict, List, Optional, Tuple
+
+from .decorators import confirm_action, create_cacher, handle_db_errors, log_time
 from .utils import load_table_data, save_table_data
 
 ALLOWED_TYPES = {"int", "str", "bool"}
+cacher = create_cacher()
 
+@handle_db_errors
 def parse_column_spec(col_spec: str) -> Tuple[str, str]:
     """
     Парсит спецификацию столбца вида 'name:type'.
     Возвращает (name, type).
     """
-    if ":" not in col_spec:
-        raise ValueError(f"Некорректный формат столбца: {col_spec}. Ожидалось 'name:type'.")
+    if not isinstance(col_spec, str) or ":" not in col_spec:
+        raise ValueError(f"Некорректный формат столбца: {col_spec}."
+                         " Ожидалось 'name:type'.")
     name, typ = col_spec.split(":", 1)
     name = name.strip()
     typ = typ.strip().lower()
     if not name:
         raise ValueError("Имя столбца не может быть пустым.")
     if typ not in ALLOWED_TYPES:
-        raise ValueError(f"Недопустимый тип '{typ}'. Разрешены: {', '.join(ALLOWED_TYPES)}.")
+        raise ValueError(f"Недопустимый тип '{typ}'."
+                         " Разрешены: {', '.join(ALLOWED_TYPES)}.")
     return name, typ
 
-def create_table(metadata: Dict[str, Any], table_name: str, columns: List[str]) -> Dict[str, Any]:
+@handle_db_errors
+def create_table(metadata: Dict[str, Any], table_name: str, 
+                 columns: List[str]) -> Dict[str, Any]:
     """
     Создаёт таблицу:
       - добавляет ID:int в начало списка столбцов;
@@ -27,48 +36,64 @@ def create_table(metadata: Dict[str, Any], table_name: str, columns: List[str]) 
       - валидирует типы;
       - возвращает обновлённые метаданные.
     """
-    if table_name in metadata:
-        print(f"Ошибка: таблица '{table_name}' уже существует.")
-        return metadata
+        # 1. Проверка на существование таблицы
+    if metadata is None:
+        # Выбрасываем ошибку. Декоратор её поймает и напишет: 
+        # "Ошибка валидации: Метаданные не переданы (None)."
+        os.remove("db_meta.json")
+        raise ValueError("Метаданные не переданы: аргумент metadata равен None."
+                         " Файл удален, попробуйте еще раз.")
+
     
-        
 
-    parsed_columns = []
-    # Добавляем ID:int первым столбцом
+    # 1. Проверка на существование таблицы
+    if table_name in metadata:
+        raise ValueError(f"Таблица '{table_name}' уже существует.")
+    
+    # Инициализируем список ДО любых потенциально опасных операций
+    parsed_columns: List[Tuple[str, str]] = []
+
+    # 2. Автоматически добавляем ID:int первым столбцом
     parsed_columns.append(("ID", "int"))
-
+    
+    # 3. Парсим остальные колонки
     for col_spec in columns:
+    # Если здесь будет ошибка (неверный формат), parse_column_spec должен сделать raise
         name, typ = parse_column_spec(col_spec)
         parsed_columns.append((name, typ))
 
+    # 4. Сохраняем структуру таблицы
     metadata[table_name] = {
         "columns": parsed_columns,
-        "rows": []  # Заготовка для строк (пока не используется, но нужна для структуры)
+        "rows": []
     }
-    print(f"Таблица '{table_name}' успешно создана со столбцами: {parsed_columns}")
+
+    print(f"Таблица \"{table_name}\" успешно создана со столбцами: {parsed_columns}")
     return metadata
 
+@confirm_action("удаление таблицы")
+@handle_db_errors
 def drop_table(metadata: Dict[str, Any], table_name: str) -> Dict[str, Any]:
     """Удаляет таблицу из метаданных."""
     if table_name not in metadata:
-        print(f"Ошибка: Таблица '{table_name}' не найдена.")
-        return metadata
+        raise KeyError(f"Ошибка: Таблица '{table_name}' не найдена.")
+        
     del metadata[table_name]
     print(f"Таблица '{table_name}' удалена.")
     return metadata
 
-
+@handle_db_errors
 def list_tables(metadata: Dict[str, Any]) -> None:
     """Выводит список всех таблиц и их столбцы."""
     if not metadata:
-        print("Таблиц нет.")
+        raise ValueError("Таблиц нет.")
         return
     for name, info in metadata.items():
         cols = ", ".join(f"{n}:{t}" for n, t in info["columns"])
         print(f"- {name}: [{cols}]")
 
 # --- CRUD ---
-
+@handle_db_errors
 def _get_schema_columns(metadata: Dict[str, Any], table_name: str):
     if table_name not in metadata:
         raise ValueError(f"Таблица '{table_name}' не существует.")
@@ -76,23 +101,24 @@ def _get_schema_columns(metadata: Dict[str, Any], table_name: str):
     # Возвращаем список (name, type) без ID на позиции 0
     return cols
 
+@handle_db_errors
 def _cast_value(value: Any, expected_type: str):
     """Приводит значение к ожидаемому типу, учитывая bool как особый случай."""
     if expected_type == "int":
         if isinstance(value, int):
             return value
         if not isinstance(value, str):
-            raise ValueError(f"Для типа int ожидается строка или число, получено: {value!r}")
+            raise ValueError("Для типа int ожидается строка или число," 
+                             "получено: {value!r}")
         # Убираем возможные пробелы
         s = value.strip()
         # Если вдруг случайно попала запятая как разделитель тысяч — удаляем её
         # Но только если это выглядит как число с запятой: "1,000" -> 1000
         if "," in s and s.replace(",", "").isdigit():
             s = s.replace(",", "")
-        try:
+        
             return int(s)
-        except ValueError:
-            raise ValueError(f"Не удалось преобразовать '{value}' в int.")
+
     elif expected_type == "str":
         return str(value[1:-1])
     elif expected_type == "bool":
@@ -112,65 +138,93 @@ def _cast_value(value: Any, expected_type: str):
         if s in ("false", "0", "no"):
             return False
 
-        raise ValueError(f"Не удалось интерпретировать '{value}' как bool. Допустимы: true/false, 1/0, yes/no.")
+        raise ValueError(f"Не удалось интерпретировать '{value}' как bool."
+                         " Допустимы: true/false, 1/0, yes/no.")
 
     else:
         return value
 
-def insert(metadata: Dict[str, Any], table_name: str, values: List[Any]) -> List[Dict[str, Any]]:
-    schema = _get_schema_columns(metadata, table_name)
-    # schema[0] — это ID:int, его мы генерируем сами
-    expected_count = len(schema) - 1
-    if len(values) != expected_count:
-        raise ValueError(
-            f"Ожидается {expected_count} значений (без ID), передано {len(values)}."
+@log_time
+@handle_db_errors
+def insert(metadata: Dict[str, Any], table_name: str, values: List[Any]) -> int:
+    if metadata is None:
+            # Выбрасываем ошибку. Декоратор её поймает и напишет: 
+            # "Ошибка валидации: Метаданные не переданы (None)."
+            
+            raise ValueError("Метаданные не переданы: аргумент " \
+            "metadata равен None. Попробуйте create_table")
+    else:
+        schema = _get_schema_columns(metadata, table_name)
+        # schema[0] — это ID:int, его мы генерируем сами
+        expected_count = len(schema) - 1
+        if len(values) != expected_count:
+            raise ValueError(
+                f"Ожидается {expected_count} значений"
+                 " (без ID), передано {len(values)}."
         )
 
-    # Валидация типов
-    for i, (val, (col_name, col_type)) in enumerate(zip(values, schema[1:]), start=1):
-        try:
-            _cast_value(val, col_type)
-        except Exception:
-            raise ValueError(f"Тип значения '{val}' не соответствует типу '{col_type}' для столбца '{col_name}'.")
+        # Валидация типов
+        for i, (val, (col_name, col_type)) in enumerate(
+            zip(values, schema[1:]), start=1):
 
-    # Загрузка данных
-    table_data = load_table_data(table_name)
+                _cast_value(val, col_type)
 
-    # Генерация ID
-    ids = [row["ID"] for row in table_data if "ID" in row]
-    new_id = (max(ids) + 1) if ids else 1
 
-    row = {"ID": new_id}
-    for (col_name, col_type), val in zip(schema[1:], values):
-        row[col_name] = _cast_value(val, col_type)
+        # Загрузка данных
+        table_data = load_table_data(table_name)
 
-    table_data.append(row)
-    save_table_data(table_name, table_data)
-    return table_data
+         # Генерация ID
+        ids = [row["ID"] for row in table_data if "ID" in row]
+        new_id = (max(ids) + 1) if ids else 1
 
+        row = {"ID": new_id}
+        for (col_name, col_type), val in zip(schema[1:], values):
+            row[col_name] = _cast_value(val, col_type)
+        id_count = row.get("ID")
+        table_data.append(row)
+        save_table_data(table_name, table_data)
+        return id_count
+
+
+@log_time
+@handle_db_errors
 def select(table_data: List[Dict], where_clause: Optional[Dict] = None):
     if not where_clause:
-        return table_data
+        raise ValueError
+        
+    """
+    Возвращает строки, строго совпадающие с where_clause.
+    Если where_clause=None — возвращает все строки.
+    """
 
 
     result = []
     for row in table_data:
+        
         match = True
         for k, v_where in where_clause.items():
+            
             if k not in row:
                 match = False
                 break
             v_row = row[k]
+            
             # Строгое сравнение: тип и значение
             if type(v_row) is not type(v_where) or v_row != v_where:
                 match = False
                 break
+            
+                
         if match:
-            result.append(row)
+            result.append(row.copy())
+            
     return result
 
-def update(table_data: List[Dict], set_clause: Dict[str, Any], where_clause: Dict[str, Any]) -> List[Dict]:
-
+@log_time
+@handle_db_errors
+def update(table_data: List[Dict], set_clause: Dict[str, Any],
+            where_clause: Dict[str, Any]) -> Tuple[List[Dict], List]:
+    id_count =[]
     for row in table_data:
         # Проверяем полное совпадение условия WHERE
       
@@ -187,19 +241,56 @@ def update(table_data: List[Dict], set_clause: Dict[str, Any], where_clause: Dic
             # Строгое сравнение: типы должны совпадать И значения должны совпадать
             if type(v_row) is not type(v_where) or v_row != v_where:
                 match = False
-                break
+                raise ValueError
         
             if match:
                 # Применяем SET только для совпавших строк
                 for k, v_set in set_clause.items():
                     if k in row:
                         row[k] = v_set
+                if "ID" in row:
+                    id_count.append(row["ID"])    
 
-    return table_data
+    return table_data,id_count
 
-def delete(table_data: List[Dict], where_clause: Dict) -> List[Dict]:
-    before_len = len(table_data)
-    filtered = [row for row in table_data if not all(row.get(k) == v for k, v in where_clause.items())]
-    if len(filtered) < before_len:
-        pass  # удаление произошло
-    return filtered
+@confirm_action("удаление строк по условию WHERE")
+@handle_db_errors
+def delete(table_data: List[Dict], where_clause: Dict) -> Tuple[List[Dict], List]:
+    
+    """
+    Удаляет строки, строго совпадающие с where_clause.
+    Возвращает (оставшиеся_данные, список_ID_удалённых_строк).
+    """
+    if not isinstance(table_data, list):
+        raise TypeError("Аргумент table_data должен быть списком.")
+    
+    if not isinstance(where_clause, dict):
+        raise TypeError("Аргумент where_clause должен быть словарем (условием).")
+    remaining = []
+    deleted_ids = []
+
+    for row in table_data:
+        # row — это dict, у него есть .get() и ключи
+        match = True
+        for k, v_where in where_clause.items():
+            # Если ключа нет в строке — не совпадение
+            if k not in row:
+                match = False
+                break
+
+            v_row = row[k]
+            # Строгое сравнение: тип и значение должны совпадать
+            if type(v_row) is not type(v_where) or v_row != v_where:
+                match = False
+                break
+
+        if match:
+            # Строка подходит под WHERE → удаляем (не добавляем в remaining)
+            if "ID" in row:
+                deleted_ids.append(row["ID"])
+            # Можно добавить логирование: print(f"Удалена строка с ID={row['ID']}")
+        else:
+            # Не подходит → оставляем
+            remaining.append(row)
+
+    return remaining, deleted_ids

@@ -1,13 +1,16 @@
 import re
 
+
 def parse_condition_string(condition: str) -> dict:
     """
-    Парсит строку вида: "age = 28" или "name = 'Alice'" в словарь {'age': 28, 'name': 'Alice'}
+    Парсит строку вида: "age = 28" или "name = 'Alice'" 
+    в словарь {'age': 28, 'name': 'Alice'}
     Требование: строковые значения должны быть в кавычках.
     Поддерживаемые кавычки: одинарные или двойные.
     """
     result = {}
-    # Ищем пары key = value, где value может быть числом, true/false или строкой в кавычках
+    # Ищем пары key = value, 
+    # где value может быть числом, true/false или строкой в кавычках
     pattern = r'(\w+)\s*=\s*(?:(true|false)|(-?\d+)|(["\'])(.*?)\4)'
     matches = re.findall(pattern, condition)
 
