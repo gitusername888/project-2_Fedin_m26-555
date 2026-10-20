@@ -1,8 +1,7 @@
 [project]
 name = "primitive-db"
 version = "0.1.0"
-description = "PrimitiveDB — простая консольная реляционная база данных с SQL-подобным интерфейсом.
-Данные хранятся в JSON-файлах, метаданные таблиц — в `db_meta.json`."
+description = "PrimitiveDB — простая консольная реляционная база данных с SQL-подобным интерфейсом. Данные хранятся в JSON-файлах, метаданные таблиц — в `db_meta.json`."
 readme = "README.md"
 authors = [
     { name = "Fedin_m26-555", email = "fdu11287@yandex.ru" }

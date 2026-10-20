@@ -22,26 +22,26 @@ PrimitiveDB — простая консольная реляционная ба�
 ## Установка и запуск
 
 uv build # сборка пакета
- uvx twine check dist/* # проверка метаданых
+uvx twine check dist/* # проверка метаданых
 source .venv/bin/activate активация пакета
 uv tool install dist/*.whl
-uv run project
+database #запуск программы
 
 
 ## Доступные команды
 
 | Команда | Описание | Пример |
 |---------|-----------|---------|
-| `create_table` | Создать таблицу. Первый столбец ID:int добавляется автоматически | `create_table users name:str age:int` |
-| `list_tables` | Показать список таблиц и их структуру | `list_tables` |
-| `drop_table` | Удалить таблицу (требует подтверждения) | `drop_table users` |
-| `insert into` | Добавить запись | `insert into users values ("Alice", 25)` |
-| `select from` | Выборка данных, поддерживает WHERE | `select from users where age = 25` |
-| `update` | Обновить строки по условию | `update users set age = 26 where name = "Alice"` |
-| `delete from` | Удалить строки по условию (требует подтверждения) | `delete from users where name = "Alice"` |
-| `info` | Показать структуру и число записей | `info users` |
-| `help` | Справка по командам | `help` |
-| `exit` | Выход | `exit` |
+| `create_table` | Создать таблицу. Первый столбец ID:int добавляется автоматически | 
+| `list_tables` | Показать список таблиц и их структуру | `
+| `drop_table` | Удалить таблицу (требует подтверждения) | 
+| `insert into` | Добавить запись | 
+| `select from` | Выборка данных, поддерживает WHERE | 
+| `update` | Обновить строки по условию | 
+| `delete from` | Удалить строки по условию (требует подтверждения) | 
+| `info` | Показать структуру и число записей | 
+| `help` | Справка по командам | 
+| `exit` | Выход | 
 
 ## Особенности синтаксиса
 
